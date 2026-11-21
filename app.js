@@ -96,15 +96,13 @@ const FLOWS = {
 };
 const PURCHASE_CATEGORIES = ['Shopping', 'Groceries', 'Subscriptions', 'Bills & recharge', 'Home & rent', 'Education', 'Entertainment'];
 
-// People: "Money sent" and "Money back" entries, keyed by the person in the description.
-// "Lunch (Manish Bhai)" counts for Manish Bhai.
+// People: "Money sent" and "Money back" entries, keyed by the person named in the description.
+// Bill shares written like "Lunch (Manish Bhai)" are not loans, so they stay off the People page.
 const PEOPLE_CATEGORIES = ['Money sent', MONEY_BACK];
 
 function personOf(t) {
-  if (!PEOPLE_CATEGORIES.includes(t.category)) return null;
-  const inBrackets = t.description.match(/\(([^)]+)\)\s*$/);
-  const name = (inBrackets ? inBrackets[1] : t.description).trim().replace(/\s+/g, ' ');
-  return name || null;
+  if (!PEOPLE_CATEGORIES.includes(t.category) || t.description.includes('(')) return null;
+  return t.description.trim().replace(/\s+/g, ' ') || null;
 }
 
 function buildPeople() {

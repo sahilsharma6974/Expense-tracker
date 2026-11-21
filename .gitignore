@@ -1,0 +1,5 @@
+.DS_Store
+.vercel
+# Personal data imports — never commit
+supabase/import-*.sql
+*.csv

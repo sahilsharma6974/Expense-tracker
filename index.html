@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Expense Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="booting">
+
+  <!-- Shown when config.js has not been filled in -->
+  <section class="auth" id="setupScreen" hidden>
+    <div class="auth-card">
+      <div class="brand"><span class="brand-mark" data-icon="wallet"></span><div><strong>Expense Tracker</strong><small>Personal finance</small></div></div>
+      <h1>Connect Supabase</h1>
+      <p class="auth-sub">Add your Supabase project URL and publishable key in <code>config.js</code>, then reload this page.</p>
+    </div>
+  </section>
+
+  <!-- Login / signup / password reset -->
+  <section class="auth" id="authScreen" hidden>
+    <div class="auth-card">
+      <div class="brand"><span class="brand-mark" data-icon="wallet"></span><div><strong>Expense Tracker</strong><small>Personal finance</small></div></div>
+      <h1 id="authTitle">Log in or sign up</h1>
+      <p class="auth-sub" id="authSub">Enter your email and we'll send you a login link. No password needed.</p>
+
+      <form id="authForm" novalidate>
+        <label class="field" id="emailField"><span>Email</span>
+          <input type="email" id="authEmail" autocomplete="email" placeholder="you@example.com" required>
+        </label>
+        <label class="field" id="codeField" hidden><span>Verification code</span>
+          <input type="text" id="authCode" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Enter the code">
+        </label>
+        <p class="auth-msg" id="authMsg" role="alert" hidden></p>
+        <button type="submit" class="btn btn-primary btn-block" id="authSubmit">Send login link</button>
+      </form>
+
+      <p class="auth-switch" id="codeActions" hidden>
+        <button type="button" class="link-btn" id="resendBtn">Resend email</button>
+        <span aria-hidden="true">&nbsp;or&nbsp;</span>
+        <button type="button" class="link-btn" id="changeEmailBtn">use a different email</button>
+        <br><button type="button" class="link-btn have-code" id="haveCodeBtn">I have a code instead</button>
+      </p>
+    </div>
+  </section>
+
+  <div class="shell" id="appShell" hidden>
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark" data-icon="wallet"></span><div><strong>Expense Tracker</strong><small>Personal finance</small></div></div>
+
+      <p class="nav-label">Workspace</p>
+      <nav class="nav" aria-label="Main">
+        <a href="#overview" data-view="overview"><span data-icon="grid"></span>Overview</a>
+        <a href="#transactions" data-view="transactions"><span data-icon="arrows"></span>Transactions</a>
+        <a href="#insights" data-view="insights"><span data-icon="chart"></span>Insights</a>
+      </nav>
+
+      <div class="account">
+        <div class="account-menu" id="accountMenu" hidden>
+          <button type="button" id="logoutBtn"><span data-icon="logout"></span>Log out</button>
+        </div>
+        <button type="button" class="account-btn" id="accountBtn" aria-haspopup="true" aria-expanded="false">
+          <span class="avatar" id="avatar">P</span>
+          <span class="account-text"><strong id="accountName">Personal account</strong><small id="accountEmail">Private workspace</small></span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">Your money, in focus</p>
+          <h1 id="pageTitle">Monthly overview</h1>
+          <p class="page-sub" id="pageSub">A clearer picture of what came in and where it went.</p>
+        </div>
+        <div class="head-actions">
+          <div class="month-switch">
+            <button type="button" id="prevMonth" aria-label="Previous month"><span data-icon="chevL"></span></button>
+            <span id="monthLabel">November 2026</span>
+            <button type="button" id="nextMonth" aria-label="Next month"><span data-icon="chevR"></span></button>
+          </div>
+          <button type="button" class="btn btn-primary" data-add><span data-icon="plus"></span>Add entry</button>
+        </div>
+      </header>
+
+      <div class="import-banner" id="importBanner" hidden>
+        <span id="importText"></span>
+        <button type="button" class="btn btn-primary btn-sm" id="importBtn">Import to my account</button>
+        <button type="button" class="link-btn" id="importDismiss">Not now</button>
+      </div>
+
+      <section class="stats" aria-label="This month">
+        <article class="stat stat-remaining">
+          <div class="stat-top"><p>Remaining this month</p><span class="stat-icon" data-icon="wallet"></span></div>
+          <p class="stat-value" id="balance">₹0.00</p>
+          <p class="stat-foot"><span data-icon="trending"></span><span id="balanceSub">Income less spending</span></p>
+        </article>
+        <article class="stat stat-income">
+          <div class="stat-top"><p>Income received</p><span class="stat-icon" data-icon="arrowIn"></span></div>
+          <p class="stat-value" id="totalIncome">₹0.00</p>
+          <div class="stat-foot stat-foot-split"><span id="incomeSub">0 income entries</span><button type="button" class="stat-action" data-add-income><span data-icon="plus"></span>Add income</button></div>
+        </article>
+        <article class="stat stat-spent">
+          <div class="stat-top"><p>Total spent</p><span class="stat-icon" data-icon="arrowOut"></span></div>
+          <p class="stat-value" id="totalExpense">₹0.00</p>
+          <p class="stat-foot" id="expenseSub">0 expense entries</p>
+        </article>
+      </section>
+
+      <!-- Overview -->
+      <div class="view" data-view="overview">
+        <div class="overview-grid">
+          <section class="card activity">
+            <div class="card-head">
+              <div><h2>Recent activity</h2><p class="card-sub">Every entry, with its payment method.</p></div>
+              <button type="button" class="btn btn-outline btn-sm" data-add><span data-icon="plus"></span>Add entry</button>
+            </div>
+            <div class="tools">
+              <label class="search"><span data-icon="search"></span><input type="search" id="ovSearch" placeholder="Search entries" aria-label="Search entries"></label>
+              <select id="ovType" aria-label="Filter activity">
+                <option value="">All activity</option>
+                <option value="expense">Expenses</option>
+                <option value="income">Income</option>
+              </select>
+            </div>
+            <div class="tx-table" id="ovTable"></div>
+          </section>
+
+          <div class="side-col">
+            <section class="card">
+              <div class="card-head">
+                <div><h2>Spending by category</h2><p class="card-sub">Where your money went this month.</p></div>
+                <span class="card-icon" data-icon="chart"></span>
+              </div>
+              <ul class="bars" id="ovCategories"></ul>
+              <div class="kept">
+                <div class="kept-row"><span>Income kept</span><strong id="keptPct">0%</strong></div>
+                <div class="track"><span id="keptBar"></span></div>
+                <p class="kept-note" id="keptNote"></p>
+              </div>
+            </section>
+
+            <section class="card cashflow">
+              <div class="cashflow-head">
+                <span class="card-icon muted" data-icon="card"></span>
+                <div><strong>Monthly cash flow</strong><small>Spent against income</small></div>
+              </div>
+              <div class="cashflow-row"><span class="big" id="spentPct">0%</span><span>of monthly income spent</span></div>
+              <div class="track red"><span id="spentBar"></span></div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transactions -->
+      <div class="view" data-view="transactions" hidden>
+        <section class="card activity">
+          <div class="card-head">
+            <div><h2>All transactions</h2><p class="card-sub">Filter by type, category or payment mode.</p></div>
+            <button type="button" class="btn btn-outline btn-sm" id="exportCsv"><span data-icon="download"></span>Export CSV</button>
+          </div>
+          <div class="tools tools-4">
+            <label class="search"><span data-icon="search"></span><input type="search" id="txSearch" placeholder="Search entries" aria-label="Search entries"></label>
+            <select id="txType" aria-label="Filter by type">
+              <option value="">All activity</option>
+              <option value="expense">Expenses</option>
+              <option value="income">Income</option>
+            </select>
+            <select id="txCategory" aria-label="Filter by category"></select>
+            <select id="txMode" aria-label="Filter by payment mode"></select>
+          </div>
+          <div class="tx-table" id="txTable"></div>
+        </section>
+      </div>
+
+      <!-- Insights -->
+      <div class="view" data-view="insights" hidden>
+        <div class="insights-grid">
+          <section class="card">
+            <div class="card-head"><div><h2>Payment modes</h2><p class="card-sub">How you paid this month.</p></div><span class="card-icon" data-icon="card"></span></div>
+            <ul class="bars" id="inModes"></ul>
+          </section>
+          <section class="card">
+            <div class="card-head"><div><h2>Monthly budget</h2><p class="card-sub">A spending limit for this month.</p></div><span class="card-icon" data-icon="wallet"></span></div>
+            <div id="budgetView"></div>
+            <form class="budget-form" id="budgetForm">
+              <label class="field"><span>Budget amount (₹)</span><input type="number" id="budgetInput" min="0" step="1" placeholder="e.g. 30000"></label>
+              <button type="submit" class="btn btn-primary">Save budget</button>
+            </form>
+          </section>
+          <section class="card">
+            <div class="card-head"><div><h2>Spending by category</h2><p class="card-sub">Where your money went this month.</p></div><span class="card-icon" data-icon="chart"></span></div>
+            <ul class="bars" id="inCategories"></ul>
+          </section>
+          <section class="card">
+            <div class="card-head"><div><h2>Income sources</h2><p class="card-sub">Where your money came from.</p></div><span class="card-icon" data-icon="arrowIn"></span></div>
+            <ul class="bars" id="inIncome"></ul>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <nav class="tabbar" aria-label="Main">
+      <a href="#overview" data-view="overview"><span data-icon="grid"></span>Overview</a>
+      <a href="#transactions" data-view="transactions"><span data-icon="arrows"></span>Transactions</a>
+      <button type="button" class="tab-add" data-add aria-label="Add entry"><span data-icon="plus"></span></button>
+      <a href="#insights" data-view="insights"><span data-icon="chart"></span>Insights</a>
+      <button type="button" id="mobileLogout"><span data-icon="logout"></span>Log out</button>
+    </nav>
+  </div>
+
+  <!-- Add / edit entry -->
+  <dialog class="modal" id="entryDialog" aria-labelledby="entryTitle">
+    <form id="entryForm" novalidate>
+      <button type="button" class="modal-close" id="closeDialog" aria-label="Close"><span data-icon="x"></span></button>
+      <h2 id="entryTitle">Add an entry</h2>
+      <p class="modal-sub" id="entrySub">Capture money in or out, including how it was paid.</p>
+
+      <div id="typeGroup">
+      <p class="field-label">Entry type</p>
+      <div class="type-toggle" role="radiogroup" aria-label="Entry type">
+        <label><input type="radio" name="type" value="expense" checked><span><i data-icon="arrowOut"></i>Expense</span></label>
+        <label><input type="radio" name="type" value="income"><span><i data-icon="arrowIn"></i>Income</span></label>
+      </div>
+      </div>
+
+      <label class="field"><span>Description</span>
+        <input type="text" id="description" maxlength="80" placeholder="e.g. Groceries" required>
+      </label>
+
+      <div class="field-row">
+        <label class="field"><span>Amount (₹)</span>
+          <input type="number" id="amount" min="0.01" step="0.01" placeholder="0.00" inputmode="decimal" required>
+        </label>
+        <label class="field"><span>Date</span>
+          <input type="date" id="date" required>
+        </label>
+      </div>
+
+      <div class="field-row">
+        <label class="field"><span>Category</span><select id="category"></select></label>
+        <label class="field"><span id="modeLabel">Payment mode</span><select id="mode"></select></label>
+      </div>
+
+      <p class="form-error" id="entryError" role="alert" hidden></p>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-danger-ghost" id="deleteEntry" hidden>Delete</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-outline" id="cancelEntry">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="saveEntry"><span data-icon="plus"></span>Save entry</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" hidden>
+    <span id="toastText"></span>
+    <button type="button" id="toastUndo" hidden>Undo</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

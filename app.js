@@ -67,7 +67,7 @@ const CATEGORIES = {
     'Business': { icon: 'store', color: '#6b5fd3' },
     'Investments': { icon: 'trending', color: '#d9902f' },
     'Gift': { icon: 'gift', color: '#c2477a' },
-    'Money received': { icon: 'arrowIn', color: '#2a8f8a' },
+    'Money back': { icon: 'arrowIn', color: '#2a8f8a' }, // your own money returned; reduces spending, not income
     'Other': { icon: 'dots', color: '#7b867f' },
   },
 };
@@ -84,9 +84,11 @@ const PAYMENT_MODES = {
   'Bank transfer': { icon: 'arrows', color: '#5f6e65' },
 };
 const DEFAULT_MODE = 'Cash';
+const MONEY_BACK = 'Money back';
 
 // Older category / mode names → current names
 const RENAMES = {
+  'Money received': 'Money back',
   'Food': 'Food & dining', 'Rent': 'Home & rent', 'Bills & Utilities': 'Bills & recharge', 'Bills & Recharge': 'Bills & recharge',
   'Debit Card': 'Debit card', 'Credit Card': 'Credit card', 'Net Banking': 'Net banking', 'Bank Transfer': 'Bank transfer',
 };
@@ -308,10 +310,13 @@ function monthTransactions() {
 
 function render({ bump = false } = {}) {
   const txs = monthTransactions();
-  const incomes = txs.filter((t) => t.type === 'income');
+  // Money coming back (repayments, refunds) offsets spending instead of counting as income
+  const moneyBack = txs.filter((t) => t.type === 'income' && t.category === MONEY_BACK);
+  const incomes = txs.filter((t) => t.type === 'income' && t.category !== MONEY_BACK);
   const expenses = txs.filter((t) => t.type === 'expense');
+  const backTotal = sum(moneyBack);
   const income = sum(incomes);
-  const expense = sum(expenses);
+  const expense = sum(expenses) - backTotal;
   const remaining = income - expense;
   const month = monthName(currentMonth);
 
@@ -322,7 +327,7 @@ function render({ bump = false } = {}) {
   animateMoney($('totalExpense'), expense);
   $('balanceSub').textContent = `Income less spending for ${month}`;
   $('incomeSub').textContent = countLabel(incomes.length, 'income');
-  $('expenseSub').textContent = countLabel(expenses.length, 'expense');
+  $('expenseSub').textContent = countLabel(expenses.length, 'expense') + (backTotal ? `, ${formatMoney(backTotal)} back` : '');
   document.querySelector('.stat-remaining').classList.toggle('negative', remaining < 0);
 
   if (bump) {

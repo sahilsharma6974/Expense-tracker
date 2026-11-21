@@ -122,14 +122,24 @@
               <label class="search"><span data-icon="search"></span><input type="search" id="ovSearch" placeholder="Search entries" aria-label="Search entries"></label>
               <select id="ovType" aria-label="Filter activity">
                 <option value="">All activity</option>
-                <option value="expense">Expenses</option>
-                <option value="income">Income</option>
+                <option value="Received">Received</option>
+                <option value="Sent">Sent</option>
+                <option value="Spent">Spent</option>
+                <option value="Purchased">Purchased</option>
               </select>
             </div>
             <div class="tx-table" id="ovTable"></div>
           </section>
 
           <div class="side-col">
+            <section class="card">
+              <div class="card-head">
+                <div><h2>Money flow</h2><p class="card-sub">Received, sent, spent and purchased this month.</p></div>
+                <span class="card-icon" data-icon="arrows"></span>
+              </div>
+              <ul class="flow-list" id="flowList"></ul>
+            </section>
+
             <section class="card">
               <div class="card-head">
                 <div><h2>Spending by category</h2><p class="card-sub">Where your money went this month.</p></div>
@@ -159,15 +169,17 @@
       <div class="view" data-view="transactions" hidden>
         <section class="card activity">
           <div class="card-head">
-            <div><h2>All transactions</h2><p class="card-sub">Filter by type, category or payment mode.</p></div>
+            <div><h2>All transactions</h2><p class="card-sub">Filter by received, sent, spent, purchased, category or payment mode.</p></div>
             <button type="button" class="btn btn-outline btn-sm" id="exportCsv"><span data-icon="download"></span>Export CSV</button>
           </div>
           <div class="tools tools-4">
             <label class="search"><span data-icon="search"></span><input type="search" id="txSearch" placeholder="Search entries" aria-label="Search entries"></label>
             <select id="txType" aria-label="Filter by type">
               <option value="">All activity</option>
-              <option value="expense">Expenses</option>
-              <option value="income">Income</option>
+              <option value="Received">Received</option>
+              <option value="Sent">Sent</option>
+              <option value="Spent">Spent</option>
+              <option value="Purchased">Purchased</option>
             </select>
             <select id="txCategory" aria-label="Filter by category"></select>
             <select id="txMode" aria-label="Filter by payment mode"></select>

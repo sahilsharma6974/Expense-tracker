@@ -86,6 +86,21 @@ const PAYMENT_MODES = {
 const DEFAULT_MODE = 'Cash';
 const MONEY_BACK = 'Money back';
 
+// What kind of money movement an entry is, shown as its own column (like the sheet's Category column)
+const FLOWS = {
+  Received: { color: '#2e8b4f', icon: 'arrowIn' },
+  Sent: { color: '#b5562f', icon: 'arrowOut' },
+  Spent: { color: '#c8433b', icon: 'banknote' },
+  Purchased: { color: '#3b6fd1', icon: 'bag' },
+};
+const PURCHASE_CATEGORIES = ['Shopping', 'Groceries', 'Subscriptions', 'Bills & recharge', 'Home & rent', 'Education', 'Entertainment'];
+
+function flowOf(t) {
+  if (t.type === 'income') return 'Received';
+  if (t.category === 'Money sent') return 'Sent';
+  return PURCHASE_CATEGORIES.includes(t.category) ? 'Purchased' : 'Spent';
+}
+
 // Older category / mode names → current names
 const RENAMES = {
   'Money received': 'Money back',
@@ -358,6 +373,7 @@ function render({ bump = false } = {}) {
   $('inModes').innerHTML = groupBars(expenses, (t) => t.mode, modeInfo, 'Add an expense to see how you paid.');
   $('inIncome').innerHTML = groupBars(incomes, (t) => t.category, (k) => categoryInfo('income', k), 'No income recorded this month.');
 
+  renderFlows(txs);
   renderBudget(expense);
   renderTables(txs);
 }
@@ -376,6 +392,18 @@ function groupBars(list, keyFn, infoFn, emptyText) {
       <span class="b-name">${escapeHtml(key)}</span>
       <span class="b-amt">${formatMoney(amt)}</span>
       <span class="b-line"><span class="b-track"><span style="width:${pct}%"></span></span><span class="b-pct">${Math.round(pct)}%</span></span>
+    </li>`;
+  }).join('');
+}
+
+function renderFlows(txs) {
+  $('flowList').innerHTML = Object.entries(FLOWS).map(([name, f]) => {
+    const list = txs.filter((t) => flowOf(t) === name);
+    const sign = name === 'Received' ? '+' : '−';
+    return `<li style="--f:${f.color}">
+      <span class="flow-icon">${icon(f.icon)}</span>
+      <span class="flow-name">${name}<small>${list.length} ${list.length === 1 ? 'entry' : 'entries'}</small></span>
+      <strong>${list.length ? sign : ''}${formatMoney(sum(list))}</strong>
     </li>`;
   }).join('');
 }
@@ -400,7 +428,7 @@ function renderBudget(expense) {
 function filterRows(txs, { q, type, category, mode }) {
   q = (q || '').trim().toLowerCase();
   return txs
-    .filter((t) => !type || t.type === type)
+    .filter((t) => !type || flowOf(t) === type)
     .filter((t) => !category || t.category === category)
     .filter((t) => !mode || t.mode === mode)
     .filter((t) => !q || t.description.toLowerCase().includes(q) || t.category.toLowerCase().includes(q) || t.mode.toLowerCase().includes(q))
@@ -428,19 +456,22 @@ function tableHtml(rows, monthCount) {
       ? '<div class="empty"><p>No entries match your search.</p></div>'
       : `<div class="empty"><p>No entries for ${monthName(currentMonth)} yet.</p><button type="button" class="btn btn-primary btn-sm" data-add>${icon('plus')}Add your first entry</button></div>`;
   }
-  const head = '<div class="tx-row tx-head"><span>Transaction</span><span>Payment mode</span><span>Date</span><span>Amount</span></div>';
+  const head = '<div class="tx-row tx-head"><span>Transaction</span><span>Type</span><span>Payment mode</span><span>Date</span><span>Amount</span></div>';
   return head + rows.map((t) => {
     const cat = categoryInfo(t.type, t.category);
     const mode = modeInfo(t.mode);
     const sign = t.type === 'expense' ? '−' : '+';
+    const flow = flowOf(t);
+    const flowPill = `<span class="flow-pill" style="--f:${FLOWS[flow].color}">${flow}</span>`;
     return `<div class="tx-row tx-item" data-id="${t.id}" role="button" tabindex="0" aria-label="Edit ${escapeHtml(t.description)}">
       <div class="tx-name">
         <span class="tx-icon ${t.type}">${icon(cat.icon)}</span>
         <div>
           <strong>${escapeHtml(t.description)}</strong>
-          <small>${escapeHtml(t.category)}<span class="tx-sub">${escapeHtml(t.mode)}, ${shortDate(t.date)}</span></small>
+          <small>${escapeHtml(t.category)}<span class="tx-sub">${flowPill} ${escapeHtml(t.mode)}, ${shortDate(t.date)}</span></small>
         </div>
       </div>
+      <span class="tx-flow">${flowPill}</span>
       <span class="tx-mode">${icon(mode.icon)}${escapeHtml(t.mode)}</span>
       <span class="tx-date">${shortDate(t.date)}</span>
       <span class="tx-amt ${t.type}">${sign}${formatMoney(t.amount)}</span>

@@ -55,6 +55,7 @@
       <nav class="nav" aria-label="Main">
         <a href="#overview" data-view="overview"><span data-icon="grid"></span>Overview</a>
         <a href="#transactions" data-view="transactions"><span data-icon="arrows"></span>Transactions</a>
+        <a href="#people" data-view="people"><span data-icon="users"></span>People</a>
         <a href="#insights" data-view="insights"><span data-icon="chart"></span>Insights</a>
       </nav>
 
@@ -77,6 +78,7 @@
           <p class="page-sub" id="pageSub">A clearer picture of what came in and where it went.</p>
         </div>
         <div class="head-actions">
+          <button type="button" class="icon-btn mobile-only" id="mobileLogout" aria-label="Log out"><span data-icon="logout"></span></button>
           <div class="month-switch">
             <button type="button" id="prevMonth" aria-label="Previous month"><span data-icon="chevL"></span></button>
             <span id="monthLabel">November 2026</span>
@@ -188,6 +190,42 @@
         </section>
       </div>
 
+      <!-- People -->
+      <div class="view" data-view="people" hidden>
+        <section class="stats" aria-label="People summary">
+          <article class="stat stat-remaining">
+            <div class="stat-top"><p>To get back</p><span class="stat-icon" data-icon="arrowIn"></span></div>
+            <p class="stat-value" id="peopleOwed">₹0.00</p>
+            <p class="stat-foot" id="peopleOwedSub">Money people still have to return</p>
+          </article>
+          <article class="stat stat-spent">
+            <div class="stat-top"><p>You owe</p><span class="stat-icon" data-icon="arrowOut"></span></div>
+            <p class="stat-value" id="peopleOwe">₹0.00</p>
+            <p class="stat-foot" id="peopleOweSub">Got back more than you sent</p>
+          </article>
+          <article class="stat stat-income">
+            <div class="stat-top"><p>People</p><span class="stat-icon" data-icon="users"></span></div>
+            <p class="stat-value" id="peopleCount">0</p>
+            <p class="stat-foot" id="peopleCountSub">0 settled</p>
+          </article>
+        </section>
+
+        <div class="people-grid">
+          <section class="card activity">
+            <div class="card-head">
+              <div><h2>People</h2><p class="card-sub">Everyone you sent money to or got money back from, across all months.</p></div>
+              <button type="button" class="btn btn-outline btn-sm" id="sendMoneyBtn"><span data-icon="arrowOut"></span>Send money</button>
+            </div>
+            <div class="tools tools-1">
+              <label class="search"><span data-icon="search"></span><input type="search" id="peopleSearch" placeholder="Search people" aria-label="Search people"></label>
+            </div>
+            <div class="tx-table" id="peopleTable"></div>
+          </section>
+
+          <section class="card person-card" id="personDetail"></section>
+        </div>
+      </div>
+
       <!-- Insights -->
       <div class="view" data-view="insights" hidden>
         <div class="insights-grid">
@@ -219,8 +257,8 @@
       <a href="#overview" data-view="overview"><span data-icon="grid"></span>Overview</a>
       <a href="#transactions" data-view="transactions"><span data-icon="arrows"></span>Transactions</a>
       <button type="button" class="tab-add" data-add aria-label="Add entry"><span data-icon="plus"></span></button>
+      <a href="#people" data-view="people"><span data-icon="users"></span>People</a>
       <a href="#insights" data-view="insights"><span data-icon="chart"></span>Insights</a>
-      <button type="button" id="mobileLogout"><span data-icon="logout"></span>Log out</button>
     </nav>
   </div>
 
@@ -239,8 +277,9 @@
       </div>
       </div>
 
-      <label class="field"><span>Description</span>
+      <label class="field"><span id="descLabel">Description</span>
         <input type="text" id="description" maxlength="80" placeholder="e.g. Groceries" required>
+        <datalist id="peopleList"></datalist>
       </label>
 
       <div class="field-row">

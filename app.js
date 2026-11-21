@@ -15,6 +15,7 @@ const ICONS = {
   arrowOut: '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
   trending: '<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
   utensils: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
@@ -95,6 +96,122 @@ const FLOWS = {
 };
 const PURCHASE_CATEGORIES = ['Shopping', 'Groceries', 'Subscriptions', 'Bills & recharge', 'Home & rent', 'Education', 'Entertainment'];
 
+// People: "Money sent" and "Money back" entries, keyed by the person in the description.
+// "Lunch (Manish Bhai)" counts for Manish Bhai.
+const PEOPLE_CATEGORIES = ['Money sent', MONEY_BACK];
+
+function personOf(t) {
+  if (!PEOPLE_CATEGORIES.includes(t.category)) return null;
+  const inBrackets = t.description.match(/\(([^)]+)\)\s*$/);
+  const name = (inBrackets ? inBrackets[1] : t.description).trim().replace(/\s+/g, ' ');
+  return name || null;
+}
+
+function buildPeople() {
+  const people = new Map();
+  [...state.transactions]
+    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt)
+    .forEach((t) => {
+      const name = personOf(t);
+      if (!name) return;
+      const key = name.toLowerCase();
+      if (!people.has(key)) people.set(key, { key, name, sent: 0, back: 0, entries: [], last: t.date });
+      const p = people.get(key);
+      p.name = name; // latest spelling wins
+      p.last = t.date;
+      p.entries.push(t);
+      if (t.type === 'expense') p.sent += t.amount;
+      else p.back += t.amount;
+    });
+  return [...people.values()].map((p) => ({ ...p, pending: Math.round((p.sent - p.back) * 100) / 100 }));
+}
+
+function pendingPill(pending) {
+  if (pending > 0) return `<span class="flow-pill" style="--f:${FLOWS.Received.color}">Gets back ${formatMoney(pending)}</span>`;
+  if (pending < 0) return `<span class="flow-pill" style="--f:${FLOWS.Spent.color}">You owe ${formatMoney(-pending)}</span>`;
+  return '<span class="flow-pill" style="--f:#7b867f">Settled</span>';
+}
+
+function initials(name) {
+  return name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+}
+
+function renderPeople() {
+  const people = buildPeople();
+  const owed = people.filter((p) => p.pending > 0);
+  const owe = people.filter((p) => p.pending < 0);
+  animateMoney($('peopleOwed'), sum(owed.map((p) => ({ amount: p.pending }))));
+  animateMoney($('peopleOwe'), sum(owe.map((p) => ({ amount: -p.pending }))));
+  $('peopleOwedSub').textContent = owed.length ? `From ${owed.length} ${owed.length === 1 ? 'person' : 'people'}` : 'Nobody owes you right now';
+  $('peopleOweSub').textContent = owe.length ? `To ${owe.length} ${owe.length === 1 ? 'person' : 'people'}` : "You don't owe anyone";
+  $('peopleCount').textContent = people.length;
+  const settled = people.filter((p) => p.pending === 0).length;
+  $('peopleCountSub').textContent = `${settled} settled`;
+
+  $('peopleList').innerHTML = people.map((p) => `<option value="${escapeHtml(p.name)}">`).join('');
+
+  const q = $('peopleSearch').value.trim().toLowerCase();
+  const rows = people
+    .filter((p) => !q || p.key.includes(q))
+    .sort((a, b) => b.pending - a.pending || b.last.localeCompare(a.last));
+
+  if (!people.length) {
+    $('peopleTable').innerHTML = `<div class="empty"><p>No people yet. Add an entry with the <strong>Money sent</strong> or <strong>Money back</strong> category and the person's name.</p><button type="button" class="btn btn-primary btn-sm" data-send-money>${icon('arrowOut')}Send money</button></div>`;
+  } else if (!rows.length) {
+    $('peopleTable').innerHTML = '<div class="empty"><p>No one matches your search.</p></div>';
+  } else {
+    $('peopleTable').innerHTML = '<div class="tx-row person-row tx-head"><span>Person</span><span>Sent</span><span>Got back</span><span>Pending</span></div>' +
+      rows.map((p) => `<div class="tx-row person-row tx-item ${p.key === selectedPerson ? 'selected' : ''}" data-person="${escapeHtml(p.key)}" role="button" tabindex="0" aria-label="Open ${escapeHtml(p.name)}">
+        <div class="tx-name">
+          <span class="person-avatar">${escapeHtml(initials(p.name))}</span>
+          <div><strong>${escapeHtml(p.name)}</strong><small>Last: ${shortDate(p.last)}<span class="tx-sub">Sent ${formatMoney(p.sent)}, got back ${formatMoney(p.back)}</span></small></div>
+        </div>
+        <span class="tx-num">${formatMoney(p.sent)}</span>
+        <span class="tx-num">${formatMoney(p.back)}</span>
+        <span class="tx-amt">${pendingPill(p.pending)}</span>
+      </div>`).join('');
+  }
+
+  if (!people.some((p) => p.key === selectedPerson)) selectedPerson = rows[0] ? rows[0].key : null;
+  document.querySelectorAll('[data-person]').forEach((el) => el.classList.toggle('selected', el.dataset.person === selectedPerson));
+  renderPersonDetail(people.find((p) => p.key === selectedPerson));
+}
+
+function renderPersonDetail(p) {
+  const el = $('personDetail');
+  if (!p) {
+    el.innerHTML = '<div class="empty"><p>Select a person to see every amount you sent and got back.</p></div>';
+    return;
+  }
+  const status = p.pending > 0
+    ? `<strong>${escapeHtml(p.name)}</strong> still has to return <strong class="pos">${formatMoney(p.pending)}</strong>.`
+    : p.pending < 0
+      ? `You got back <strong class="neg">${formatMoney(-p.pending)}</strong> more than you sent to <strong>${escapeHtml(p.name)}</strong>.`
+      : `All settled with <strong>${escapeHtml(p.name)}</strong>.`;
+  el.innerHTML = `
+    <div class="person-head">
+      <span class="person-avatar big">${escapeHtml(initials(p.name))}</span>
+      <div><h2>${escapeHtml(p.name)}</h2><p class="card-sub">${p.entries.length} ${p.entries.length === 1 ? 'entry' : 'entries'}, all months</p></div>
+    </div>
+    <p class="person-status">${status}</p>
+    <div class="person-totals">
+      <div><small>Sent</small><strong>${formatMoney(p.sent)}</strong></div>
+      <div><small>Got back</small><strong>${formatMoney(p.back)}</strong></div>
+      <div><small>Pending</small><strong>${formatMoney(Math.abs(p.pending))}</strong></div>
+    </div>
+    <div class="person-actions">
+      <button type="button" class="btn btn-primary btn-sm" data-person-back="${escapeHtml(p.name)}">${icon('arrowIn')}Record money back</button>
+      <button type="button" class="btn btn-outline btn-sm" data-person-send="${escapeHtml(p.name)}">${icon('arrowOut')}Send money</button>
+    </div>
+    <ul class="person-timeline">
+      ${[...p.entries].reverse().map((t) => `<li class="tx-item" data-id="${t.id}" role="button" tabindex="0" aria-label="Edit entry">
+        <span class="flow-icon" style="--f:${t.type === 'expense' ? FLOWS.Sent.color : FLOWS.Received.color}">${icon(t.type === 'expense' ? 'arrowOut' : 'arrowIn')}</span>
+        <span class="pt-main"><strong>${t.type === 'expense' ? 'Sent' : 'Got back'}</strong><small>${shortDate(t.date)} ${t.date.slice(0, 4)}, ${escapeHtml(t.mode)}${t.description.toLowerCase() !== p.key ? `, ${escapeHtml(t.description)}` : ''}</small></span>
+        <span class="tx-amt ${t.type}">${t.type === 'expense' ? '−' : '+'}${formatMoney(t.amount)}</span>
+      </li>`).join('')}
+    </ul>`;
+}
+
 function flowOf(t) {
   if (t.type === 'income') return 'Received';
   if (t.category === 'Money sent') return 'Sent';
@@ -110,6 +227,7 @@ const RENAMES = {
 
 const VIEWS = {
   overview: { title: 'Monthly overview', sub: 'A clearer picture of what came in and where it went.' },
+  people: { title: 'People', sub: 'Money you sent to people, what came back, and what is still pending.' },
   transactions: { title: 'Transactions', sub: 'Every entry for the month, searchable and filterable.' },
   insights: { title: 'Insights', sub: 'How you paid, where it went, and how close you are to your budget.' },
 };
@@ -124,6 +242,7 @@ let db = null;
 let user = null;
 let currentMonth = todayISO().slice(0, 7);
 let currentView = 'overview';
+let selectedPerson = null; // lower-cased person key on the People page
 let editingId = null;
 let lastSavedId = null;
 let toastTimer = null;
@@ -313,6 +432,7 @@ function setView(view) {
     if (active) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   });
+  document.querySelector('.main').dataset.view = currentView;
   $('pageTitle').textContent = VIEWS[currentView].title;
   $('pageSub').textContent = VIEWS[currentView].sub;
 }
@@ -374,6 +494,7 @@ function render({ bump = false } = {}) {
   $('inIncome').innerHTML = groupBars(incomes, (t) => t.category, (k) => categoryInfo('income', k), 'No income recorded this month.');
 
   renderFlows(txs);
+  renderPeople();
   renderBudget(expense);
   renderTables(txs);
 }
@@ -494,6 +615,15 @@ function syncTypeFields(category) {
   const type = selectedType();
   fillSelect($('category'), Object.keys(CATEGORIES[type]), category);
   $('modeLabel').textContent = type === 'income' ? 'Received via' : 'Payment mode';
+  syncPersonField();
+}
+
+function syncPersonField() {
+  const isPerson = PEOPLE_CATEGORIES.includes($('category').value);
+  $('descLabel').textContent = isPerson ? 'Person' : 'Description';
+  $('description').placeholder = isPerson ? 'e.g. Happu jiju' : 'e.g. Groceries';
+  if (isPerson) $('description').setAttribute('list', 'peopleList');
+  else $('description').removeAttribute('list');
 }
 
 // preset: values for a new entry, e.g. { type: 'income', description: '…' }
@@ -510,12 +640,12 @@ function openEntry(id = null, preset = {}) {
   $('date').value = t ? t.date : (currentMonth === todayISO().slice(0, 7) ? todayISO() : `${currentMonth}-01`);
   // "Add income" opens an income-only form without the Expense/Income switch
   const incomeOnly = !t && preset.incomeOnly;
-  $('typeGroup').hidden = incomeOnly;
-  $('entryTitle').textContent = t ? 'Edit entry' : incomeOnly ? 'Add income' : 'Add an entry';
-  $('entrySub').textContent = incomeOnly
+  $('typeGroup').hidden = incomeOnly || (!t && preset.lockType);
+  $('entryTitle').textContent = t ? 'Edit entry' : preset.title || (incomeOnly ? 'Add income' : 'Add an entry');
+  $('entrySub').textContent = preset.sub || (incomeOnly
     ? `Record money you received in ${monthName(currentMonth)}.`
-    : 'Capture money in or out, including how it was paid.';
-  $('saveEntry').innerHTML = t ? 'Save changes' : `${icon('plus')}${incomeOnly ? 'Save income' : 'Save entry'}`;
+    : 'Capture money in or out, including how it was paid.');
+  $('saveEntry').innerHTML = t ? 'Save changes' : `${icon('plus')}${preset.saveLabel || (incomeOnly ? 'Save income' : 'Save entry')}`;
   $('deleteEntry').hidden = !t;
   $('entryDialog').showModal();
   (preset.description ? $('amount') : $('description')).focus();
@@ -880,17 +1010,35 @@ $('mobileLogout').addEventListener('click', () => db.auth.signOut());
 
 document.addEventListener('click', (e) => {
   if (e.target.closest('[data-add]')) openEntry();
+  const back = e.target.closest('[data-person-back]');
+  if (back) {
+    const name = back.dataset.personBack;
+    openEntry(null, { type: 'income', lockType: true, category: MONEY_BACK, mode: 'Google Pay', description: name,
+      title: 'Record money back', sub: `Money ${name} returned to you.`, saveLabel: 'Save' });
+  }
+  const send = e.target.closest('[data-person-send], [data-send-money]');
+  if (send) {
+    const name = send.dataset.personSend || '';
+    openEntry(null, { type: 'expense', lockType: true, category: 'Money sent', description: name,
+      title: 'Send money', sub: name ? `Money you gave to ${name}.` : 'Money you gave to someone. Type their name as the person.', saveLabel: 'Save' });
+  }
+  const personRow = e.target.closest('[data-person]');
+  if (personRow) {
+    selectedPerson = personRow.dataset.person;
+    renderPeople();
+    if (window.innerWidth <= 1100) $('personDetail').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+  }
   if (e.target.closest('[data-add-income]')) {
     openEntry(null, { type: 'income', incomeOnly: true, category: 'Salary', mode: 'Bank transfer', description: `Income for ${monthName(currentMonth)}` });
   }
-  const row = e.target.closest('.tx-item');
+  const row = e.target.closest('.tx-item[data-id]');
   if (row) openEntry(row.dataset.id);
 });
 document.addEventListener('keydown', (e) => {
   const row = e.target.closest && e.target.closest('.tx-item');
   if (row && (e.key === 'Enter' || e.key === ' ')) {
     e.preventDefault();
-    openEntry(row.dataset.id);
+    row.click();
   }
 });
 
@@ -898,6 +1046,10 @@ window.addEventListener('hashchange', () => setView(location.hash.slice(1)));
 
 $('prevMonth').addEventListener('click', () => { currentMonth = shiftMonth(currentMonth, -1); render(); });
 $('nextMonth').addEventListener('click', () => { currentMonth = shiftMonth(currentMonth, 1); render(); });
+
+$('category').addEventListener('change', syncPersonField);
+$('sendMoneyBtn').dataset.sendMoney = '';
+$('peopleSearch').addEventListener('input', renderPeople);
 
 ['ovSearch', 'ovType', 'txSearch', 'txType', 'txCategory', 'txMode'].forEach((id) =>
   $(id).addEventListener('input', () => renderTables(monthTransactions())));
